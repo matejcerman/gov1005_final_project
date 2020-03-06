@@ -1,0 +1,54 @@
+---
+title: "Gather Final Project Data"
+author: "Matej Cerman"
+date: "3/6/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = F)
+
+# load packages
+library(tidyverse)
+library(janitor)
+library(readxl)
+```
+
+The first task is to load the datasets obtained from INEKO, a think-tank that compiles school rankings based on various educational outcomes.
+
+```{r load school data}
+
+# This function allows me to read in csv files compiled
+# by INEKO, the think-tank whose data I'm using. It uses
+# international encoding that recognizes special signs in
+# the Slovak alphabet (like á, č, ä, ô, etc.) and uses a
+# decimal comma instead of a decimal point
+
+read_slovak_csv <- function(path, ...) {
+  read_delim(file = path, 
+             delim = ";", 
+             escape_double = FALSE, 
+             locale = locale(decimal_mark = ",", encoding = "WINDOWS-1252"), 
+             trim_ws = TRUE,
+             ...) %>%
+    clean_names()
+}
+
+# Tet's use this function to load 4 datasets: (1) a list
+# of all schools with basic information such as location,
+# size, and type, (2) values of the indicators measured by 
+# INEKO in the 2018/2019 school year, (3) additional data
+# about these indicators, and (4) the total rating calculated
+# by INEKO based on these indicators
+
+schools_list <- read_slovak_csv("raw_data/INEKO/recent/zoznam_skol.csv")
+schools_indicators <- read_slovak_csv("raw_data/INEKO/recent/udaje_2018-19.csv")
+schools_indicators_additional <- read_slovak_csv("raw_data/INEKO/recent/doplnujuce_udaje_2018-19.csv")
+schools_ratings <- read_slovak_csv("raw_data/INEKO/recent/celkove_hodnotenie_2018-19.csv")
+
+# Please note that all of these produce messages about R
+# parsing column types based on the data. For the most part,
+# R guesses correctly, but I'll deal with the problematic columns
+# later, should they be needed for my analysis.
+```
+
