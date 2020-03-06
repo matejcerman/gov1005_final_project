@@ -52,3 +52,19 @@ schools_ratings <- read_slovak_csv("raw_data/INEKO/recent/celkove_hodnotenie_201
 # later, should they be needed for my analysis.
 ```
 
+Next, I will load datasets from two government sources: a csv with average monthly salaries in each Slovak county created by the Slovak Bureau of Statistics, and a xlsx with the unemployment rate in each county from the Ministry of Labor and Social Affairs. Again, there won't be any flashy output, just loaded R objects.
+
+```{r load government data}
+
+# This csv uses a similar structure as the previous ones,
+# so I can reuse my function.
+
+wages <- read_slovak_csv("raw_data/Government/wages.csv",
+                         skip = 3,
+                         col_names = c("county", "type", "avg_wage"))
+
+#
+
+```
+
+If you want to check out the code, the link to my repo is [here](https://github.com/matejcerman/gov1005_final_project). gather.Rmd loads the data
