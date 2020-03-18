@@ -5,6 +5,10 @@ date: "3/18/2020"
 output: html_document
 ---
 
+My final project will focus on finding regional patterns in the ratings of Slovak primary and secondary schools, mainly the dependence of schools' performances on the socioeconomic situation of their counties. The plot below is the first attempt at viewing these relationships, as it looks at the overall rating of primary schools in all counties (provided by INEKO, a Slovak NGO) versus the average monthly salary in these counties (collected by the Slovak government).
+
+You can find my GitHub repo [here](https://github.com/matejcerman/gov1005_final_project).
+
 ```{r setup, include = FALSE}
 knitr::opts_chunk$set(echo = F)
 
@@ -137,13 +141,14 @@ regional_summary$region <- fct_reorder(regional_summary$region,
                                        na.rm = TRUE)
 
 # Make a clearly labeled scatterplot of the average primary school rating within
-# a county versus the average monthly salary
+# a county versus the average monthly salary, with the color of points
+# corresponding to the administrative region
 
 regional_summary %>%
   ggplot(aes(x = avg_wage, y = avg_score, color = region)) +
   geom_point(alpha = 0.75) +
   labs(title = "Average Rating of Primary Schools Versus Average Monthly Salary",
-       subtitle = "In 79 Slovak counties grouped in 8 administrative regions",
+       subtitle = "In 79 Slovak counties grouped into 8 administrative regions (in 2018)",
        x = "Average Gross Monthly Salary (Eur)",
        y = "Average Score of Primary Schools \n on a scale from 0 to 10",
        color = "Region") +
