@@ -1,0 +1,125 @@
+---
+title: "Initial Visualization"
+author: "Matej Cerman"
+date: "3/18/2020"
+output: html_document
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = F)
+
+# load packages
+library(tidyverse)
+library(janitor)
+library(readxl)
+```
+
+```{r load_data, message = FALSE}
+
+# This function allows me to read in csv files compiled
+# by INEKO, the think-tank whose data I'm using. It uses
+# international encoding that recognizes special signs in
+# the Slovak alphabet (like á, č, ä, ô, etc.) and uses a
+# decimal comma instead of a decimal point
+
+read_slovak_csv <- function(path, ...) {
+  read_delim(file = path, 
+             delim = ";", 
+             escape_double = FALSE, 
+             locale = locale(decimal_mark = ",", encoding = "WINDOWS-1252"), 
+             trim_ws = TRUE,
+             ...) %>%
+    clean_names()
+}
+
+# Loading 4 datasets obtained from INEKO 
+
+raw_school_ratings <- read_slovak_csv("../raw_data/INEKO/recent/celkove_hodnotenie_2018-19.csv")
+
+# Please note that all of these produce messages about R
+# parsing column types based on the data. For the most part,
+# R guesses correctly, but I'll deal with the problematic columns
+# later, should they be needed for my analysis.
+
+# Load government data
+
+raw_wages <- read_slovak_csv("../raw_data/Government/wages.csv",
+                         skip = 3,
+                         col_names = c("county", "type", "avg_wage")) %>%
+  clean_names()
+
+unemployment <- read_xlsx("../raw_data/Government/unemployment.xlsx",
+                          sheet = 3,
+                          skip = 7) %>%
+  clean_names()
+
+```
+
+```{r clean_data}
+
+school_ratings <- raw_school_ratings %>%
+  select(-druh_skoly, -nazov, -ulica) %>%
+  rename(region = kraj,
+         county = okres,
+         school_board = zriadovatel,
+         language = jazyk,
+         type = typ_skoly,
+         town = obec,
+         zip_code = psc,
+         overall_rating = celkove_hodnotenie,
+         math = matematika,
+         first_language = vyucovaci_jazyk,
+         foreign_languages = cudzie_jazyky,
+         special_achievements = mimoriadne_vysledky,
+         alumni_unemployment = nezamestnanost_absolventov,
+         inspection_results = vysledky_inspekcie,
+         competition_results = ucasti_na_sutaziach,
+         college_admissions = prijimanie_na_vs,
+         teachers = pedagogicky_zbor,
+         financial_resources = financne_zdroje) %>%
+  mutate(region = as.factor(region),
+         county = as.factor(county),
+         school_board = as.factor(school_board),
+         language = as.factor(language),
+         type = as.factor(type),
+         town = as.factor(town))
+
+wages <- raw_wages %>%
+  mutate(county = str_remove(county,
+                             pattern = "Okres ")) %>%
+  select(-type) %>%
+  mutate(county = as.factor(county))
+
+
+```
+
+```{r boxplot}
+
+school_ratings %>%
+  filter(type == "Základná škola") %>%
+  ggplot(aes(x = region, y = overall_rating)) +
+  geom_boxplot(na.rm = T)
+  
+```
+
+```{r scatterplot}
+
+ratings_with_wages <- school_ratings %>%
+  inner_join(wages, by = "county") %>%
+  rename(avg_wage_county = avg_wage)
+
+regional_summary <- ratings_with_wages %>%
+  filter(type == "Základná škola") %>%
+  group_by(region, county) %>%
+  summarize(avg_score = mean(overall_rating, na.rm = TRUE),
+            avg_wage = mean(avg_wage_county))
+
+regional_summary %>%
+  ggplot(aes(x = avg_wage, y = avg_score)) +
+  geom_jitter()
+
+lm(avg_score ~ avg_wage, regional_summary)
+```
+
+
+

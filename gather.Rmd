@@ -63,7 +63,12 @@ wages <- read_slovak_csv("raw_data/Government/wages.csv",
                          skip = 3,
                          col_names = c("county", "type", "avg_wage"))
 
-#
+# Next, let's use the readxl package to load the Excel data
+
+unemployment <- read_xlsx("raw_data/Government/unemployment.xlsx",
+                          sheet = 3,
+                          skip = 7) %>%
+  clean_names()
 
 ```
 
