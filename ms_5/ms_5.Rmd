@@ -41,14 +41,14 @@ raw_school_ratings <- read_slovak_csv("../raw_data/INEKO/recent/celkove_hodnoten
 # R guesses correctly, but I'll deal with the problematic columns
 # later, should they be needed for my analysis.
 
-# Load government data
+# Load governmental data
 
 raw_wages <- read_slovak_csv("../raw_data/Government/wages.csv",
                          skip = 3,
                          col_names = c("county", "type", "avg_wage")) %>%
   clean_names()
 
-unemployment <- read_xlsx("../raw_data/Government/unemployment.xlsx",
+raw_unemployment <- read_xlsx("../raw_data/Government/unemployment.xlsx",
                           sheet = 3,
                           skip = 7) %>%
   clean_names()
@@ -90,17 +90,12 @@ wages <- raw_wages %>%
   select(-type) %>%
   mutate(county = as.factor(county))
 
-
+unemployment <- raw_unemployment %>%
+  rename(county = uzemie,
+         unemployment_rate = miera_evidovanej_nezamestnanosti_v_percent) %>%
+  select(county, unemployment_rate)
 ```
 
-```{r boxplot}
-
-school_ratings %>%
-  filter(type == "Základná škola") %>%
-  ggplot(aes(x = region, y = overall_rating)) +
-  geom_boxplot(na.rm = T)
-  
-```
 
 ```{r scatterplot}
 
@@ -114,11 +109,20 @@ regional_summary <- ratings_with_wages %>%
   summarize(avg_score = mean(overall_rating, na.rm = TRUE),
             avg_wage = mean(avg_wage_county))
 
-regional_summary %>%
-  ggplot(aes(x = avg_wage, y = avg_score)) +
-  geom_jitter()
+regional_summary$region <- fct_reorder(regional_summary$region,
+                                       regional_summary$avg_score,
+                                       .desc = TRUE,
+                                       na.rm = TRUE)
 
-lm(avg_score ~ avg_wage, regional_summary)
+regional_summary %>%
+  ggplot(aes(x = avg_wage, y = avg_score, color = region)) +
+  geom_point(alpha = 0.75) +
+  labs(title = "Average Rating of Primary Schools Versus Average Monthly Salary",
+       subtitle = "In 79 Slovak counties grouped in 8 administrative regions",
+       x = "Average Gross Monthly Salary (Eur)",
+       y = "Average Score of Primary Schools \n on a scale from 0 to 10",
+       color = "Region") +
+  theme_classic()
 ```
 
 
