@@ -57,6 +57,9 @@ raw_unemployment <- read_xlsx("../raw_data/Government/unemployment.xlsx",
 
 ```{r clean_data}
 
+# Only keep columns that provide useful information and translate column names
+# to English in order to make this legible to all readers
+
 school_ratings <- raw_school_ratings %>%
   select(-druh_skoly, -nazov, -ulica) %>%
   rename(region = kraj,
@@ -77,6 +80,9 @@ school_ratings <- raw_school_ratings %>%
          college_admissions = prijimanie_na_vs,
          teachers = pedagogicky_zbor,
          financial_resources = financne_zdroje) %>%
+  
+  # Change categorical columns to factors for easier plotting and manipulation
+  
   mutate(region = as.factor(region),
          county = as.factor(county),
          school_board = as.factor(school_board),
@@ -84,11 +90,18 @@ school_ratings <- raw_school_ratings %>%
          type = as.factor(type),
          town = as.factor(town))
 
+# This piece of code keeps only informative columns and also removes the word
+# "Okres" translating to "County" from county names. This makes it possible to
+# join the datasets by county
+
 wages <- raw_wages %>%
   mutate(county = str_remove(county,
                              pattern = "Okres ")) %>%
   select(-type) %>%
   mutate(county = as.factor(county))
+
+# Keep only useful columns from the unemployment data and translate them to
+# English
 
 unemployment <- raw_unemployment %>%
   rename(county = uzemie,
@@ -96,12 +109,18 @@ unemployment <- raw_unemployment %>%
   select(county, unemployment_rate)
 ```
 
-
 ```{r scatterplot}
+
+# Join the tibble of school rankings with the data about the average salary by
+# the "county" variable
 
 ratings_with_wages <- school_ratings %>%
   inner_join(wages, by = "county") %>%
   rename(avg_wage_county = avg_wage)
+
+# Filter for only primary schools ("Základná škola" in Slovak) and find the
+# average school rating (computed by the NGO that aggregated the data) in each
+# county
 
 regional_summary <- ratings_with_wages %>%
   filter(type == "Základná škola") %>%
@@ -109,10 +128,16 @@ regional_summary <- ratings_with_wages %>%
   summarize(avg_score = mean(overall_rating, na.rm = TRUE),
             avg_wage = mean(avg_wage_county))
 
+# Reorder the names of regions by the average school rating within those regions
+# for prettier and clearer plots
+
 regional_summary$region <- fct_reorder(regional_summary$region,
                                        regional_summary$avg_score,
                                        .desc = TRUE,
                                        na.rm = TRUE)
+
+# Make a clearly labeled scatterplot of the average primary school rating within
+# a county versus the average monthly salary
 
 regional_summary %>%
   ggplot(aes(x = avg_wage, y = avg_score, color = region)) +
