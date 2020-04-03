@@ -1,7 +1,8 @@
 
 library(shiny)
 
-# Define UI for application that draws a histogram
+# Define UI with a navigation bar that will eventually contain multiple panels
+
 ui <- navbarPage("Shiny App",
     tabPanel("About"),
     tabPanel("Plot",
