@@ -147,11 +147,15 @@ regional_summary$region <- fct_reorder(regional_summary$region,
 regional_summary %>%
   ggplot(aes(x = avg_wage, y = avg_score, color = region)) +
   geom_point(alpha = 0.75) +
+  stat_smooth(aes(x = avg_wage, y = avg_score), inherit.aes = FALSE, 
+              method = "lm", geom = "line",
+              color = "black", alpha = 0.7) +
   labs(title = "Average Rating of Primary Schools Versus Average Monthly Salary",
        subtitle = "In 79 Slovak counties grouped into 8 administrative regions (in 2018)",
        x = "Average Gross Monthly Salary (Eur)",
        y = "Average Score of Primary Schools \n on a scale from 0 to 10",
-       color = "Region") +
+       color = "Region",
+       caption = "Sources: INEKO, data.gov.sk") +
   theme_classic()
 ```
 
