@@ -8,9 +8,11 @@ ui <- navbarPage("Shiny App",
     tabPanel("Plot",
 
     # Application title
+    
     titlePanel("Investigating Associations Between the Quality of Schools and Average Income in Slovak Counties"),
 
         # Show an image of the plot that is rendered on the server side
+    
         mainPanel(
             imageOutput("plt")
         )
