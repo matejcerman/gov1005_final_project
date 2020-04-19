@@ -4,6 +4,8 @@ library(tidyverse)
 library(janitor)
 library(readxl)
 
+prep_data <- function() {
+
 # This function allows me to read in csv files compiled by INEKO, the think-tank
 # whose data I'm using. It uses international encoding that recognizes special
 # signs in the Slovak alphabet (like á, č, ä, ô, etc.) and uses a decimal comma
@@ -20,7 +22,8 @@ read_slovak_csv <- function(path, ...) {
 }
 
 # Load in the ratings of all primary and high schools while translating column
-# names to make the analysis more legible
+# names to make the analysis more legible. Also load in the actual indicators
+# that make up the final rating for each school and its geographical coordinates
 
 school_ratings <- read_slovak_csv("raw_data/INEKO/recent/celkove_hodnotenie_2018-19.csv",
                                       col_types = 'dffffffccffddddddddddddd') %>%
@@ -47,6 +50,24 @@ school_ratings <- read_slovak_csv("raw_data/INEKO/recent/celkove_hodnotenie_2018
          teachers = pedagogicky_zbor,
          financial_resources = financne_zdroje)
 
+school_indicators <- read_slovak_csv(
+  "raw_data/INEKO/recent/udaje_2018-19.csv",
+  col_types = 'dffffffccffdddddddddddddddddddddddddddddddddd'
+  ) %>%
+  select(-id, -kraj, -okres, - zriadovatel, - druh_skoly, -jazyk,
+         -typ_skoly, -nazov, -ulica, -obec, -psc)
+
+school_coords <- read_slovak_csv(
+  'raw_data/INEKO/recent/zoznam_skol.csv',
+  
+  col_types = 'dffffffccffdddddddccccdfffff'
+) %>%
+  select(sur_x, sur_y) %>%
+  rename(
+    coord_x = sur_x,
+    coord_y = sur_y
+  )
+
 # Load in the two forms of economic data for all counties and manipulate the
 # county names so that they match. I also remove iformation about regions that
 # are not counties from the unemployment dataset
@@ -55,14 +76,19 @@ wages <- read_slovak_csv("raw_data/Government/wages.csv",
                              skip = 3,
                              col_names = c("county_broken", "type", "avg_wage"),
                              col_types = 'ffd') %>%
-  select(county, avg_wage) %>%
-  mutate(county = str_remove(county_broken, pattern = "Okres "))
+  select(county_broken, avg_wage) %>%
+  mutate(county = str_remove(county_broken, pattern = "Okres ")) %>%
+  select(-county_broken)
   
 
-unemployment <- read_xlsx("raw_data/Government/unemployment.xlsx",
-                              sheet = 3,
-                              skip = 9) %>%
-  clean_names() %>%
+unemployment <- read_xlsx(
+  "raw_data/Government/unemployment.xlsx",
+  sheet = 3,
+  skip = 9,
+  col_names = c("x1", "x2", "x3", "x4", "x5",
+                "x6", "x7", "x8", "x9", "x10",
+                "x11", "x12", "x13", "x14", "x15")
+  ) %>%
   rename(county = x1,
          unemployment_rate = x15) %>%
   select(county, unemployment_rate) %>%
@@ -83,8 +109,15 @@ ec_data <- unemployment %>%
 
 levels(school_ratings$county) <- levels(ec_data$county)
 
-# Join the school ratings with economic data to prepare the full dataset for
+# Join the school information with economic data to prepare the full dataset for
 # analysis
 
 schools_ec <- school_ratings %>%
-  full_join(ec_data, by = "county")
+  full_join(ec_data, by = "county") %>%
+  bind_cols(school_indicators) %>%
+  bind_cols(school_coords)
+
+return(schools_ec)
+}
+
+schools_ec <- prep_data()
