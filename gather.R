@@ -72,14 +72,36 @@ school_coords <- read_slovak_csv(
 # county names so that they match. I also remove iformation about regions that
 # are not counties from the unemployment dataset
 
+density <- read_slovak_csv('raw_data/Government/density.csv',
+                           col_names = c('county', 'indicator', 'value'),
+                           col_types = 'ffd',
+                           skip = 1
+                           ) %>%
+  mutate(county = str_remove(county, 'Okres '))
+
+for (i in 1:nrow(density)) {
+  if (is.na(density[i,1])) {
+    density[i,1] <- density[i-1,1]
+  }
+}
+
+density <- density %>%
+  pivot_wider(names_from = 'indicator', values_from = 'value') %>%
+  rename(
+    pop_total = `Stav trvale bývajúceho obyvate¾stva k 30.6.(1.7.) (Osoba)`,
+    pop_density = `Hustota obyvate¾stva (Osoba na kilometer štvorcový)`
+  )
+
 wages <- read_slovak_csv("raw_data/Government/wages.csv",
                              skip = 3,
                              col_names = c("county_broken", "type", "avg_wage"),
                              col_types = 'ffd') %>%
   select(county_broken, avg_wage) %>%
   mutate(county = str_remove(county_broken, pattern = "Okres ")) %>%
-  select(-county_broken)
+  select(county, avg_wage)
   
+wages_density <- wages %>%
+  full_join(density, by = 'county')
 
 unemployment <- read_xlsx(
   "raw_data/Government/unemployment.xlsx",
@@ -100,7 +122,7 @@ unemployment <- read_xlsx(
 # data
 
 ec_data <- unemployment %>%
-  bind_cols(wages) %>%
+  bind_cols(wages_density) %>%
   mutate(county = as_factor(county)) %>%
   select(-county1)
 
