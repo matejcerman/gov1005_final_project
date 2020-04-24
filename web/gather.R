@@ -25,7 +25,7 @@ read_slovak_csv <- function(path, ...) {
 # names to make the analysis more legible. Also load in the actual indicators
 # that make up the final rating for each school and its geographical coordinates
 
-school_ratings <- read_slovak_csv("raw_data/INEKO/recent/celkove_hodnotenie_2018-19.csv",
+school_ratings <- read_slovak_csv("raw_data/celkove_hodnotenie_2018-19.csv",
                                       col_types = 'dffffffccffddddddddddddd') %>%
   rename(id = id,
          region = kraj,
@@ -51,33 +51,36 @@ school_ratings <- read_slovak_csv("raw_data/INEKO/recent/celkove_hodnotenie_2018
          financial_resources = financne_zdroje)
 
 school_indicators <- read_slovak_csv(
-  "raw_data/INEKO/recent/udaje_2018-19.csv",
+  "raw_data/udaje_2018-19.csv",
   col_types = 'dffffffccffdddddddddddddddddddddddddddddddddd'
   ) %>%
   select(-id, -kraj, -okres, - zriadovatel, - druh_skoly, -jazyk,
          -typ_skoly, -nazov, -ulica, -obec, -psc)
 
 school_coords <- read_slovak_csv(
-  'raw_data/INEKO/recent/zoznam_skol.csv',
+  'raw_data/zoznam_skol.csv',
   
   col_types = 'dffffffccffdddddddccccdfffff'
 ) %>%
   select(sur_x, sur_y) %>%
   rename(
-    coord_x = sur_x,
-    coord_y = sur_y
+    lng = sur_x,
+    lat = sur_y
   )
 
 # Load in the two forms of economic data for all counties and manipulate the
 # county names so that they match. I also remove iformation about regions that
 # are not counties from the unemployment dataset
 
-density <- read_slovak_csv('raw_data/Government/density.csv',
+density <- read_slovak_csv('raw_data/density.csv',
                            col_names = c('county', 'indicator', 'value'),
-                           col_types = 'ffd',
+                           col_types = 'fcd',
                            skip = 1
                            ) %>%
   mutate(county = str_remove(county, 'Okres '))
+
+density$indicator[seq(1, nrow(density), 2)] <- 'pop_density'
+density$indicator[seq(2, nrow(density), 2)] <- 'pop_total'
 
 for (i in 1:nrow(density)) {
   if (is.na(density[i,1])) {
@@ -86,13 +89,9 @@ for (i in 1:nrow(density)) {
 }
 
 density <- density %>%
-  pivot_wider(names_from = 'indicator', values_from = 'value') %>%
-  rename(
-    pop_total = `Stav trvale bývajúceho obyvate¾stva k 30.6.(1.7.) (Osoba)`,
-    pop_density = `Hustota obyvate¾stva (Osoba na kilometer štvorcový)`
-  )
+  pivot_wider(names_from = 'indicator', values_from = 'value')
 
-wages <- read_slovak_csv("raw_data/Government/wages.csv",
+wages <- read_slovak_csv("raw_data/wages.csv",
                              skip = 3,
                              col_names = c("county_broken", "type", "avg_wage"),
                              col_types = 'ffd') %>%
@@ -104,7 +103,7 @@ wages_density <- wages %>%
   full_join(density, by = 'county')
 
 unemployment <- read_xlsx(
-  "raw_data/Government/unemployment.xlsx",
+  "raw_data/unemployment.xlsx",
   sheet = 3,
   skip = 9,
   col_names = c("x1", "x2", "x3", "x4", "x5",
@@ -142,4 +141,32 @@ schools_ec <- school_ratings %>%
 return(schools_ec)
 }
 
+# Use the function to load in the master dataset
+
 schools_ec <- prep_data()
+
+# Create new helper variables for modeling
+
+schools_ec <- schools_ec %>%
+  mutate(
+    super_region = case_when(
+      region == 'Banskobystrický' | region == 'Žilinský' ~ 'Central',
+      region == 'Košický' | region == 'Prešovský' ~ 'Eastern',
+      TRUE ~ 'Western'
+    ),
+    pub_pri = case_when(
+      school_board %in% c("Krajský úrad, Okresný úrad",
+                          "Obec",
+                          "Samosprávny kraj") ~ 'Public',
+      school_board %in% c("Súkromník",
+                          "Cirkev, cirkevné spoloèenstvo",
+                          "Obèianske združenia") ~ 'Private',
+      TRUE ~ 'Misc'
+    )
+  )
+
+hs <- schools_ec %>%
+  filter(type == 'Stredná odborná škola' | type == 'Gymnázium')
+
+pr <- schools_ec %>%
+  filter(type == 'Základná škola')
