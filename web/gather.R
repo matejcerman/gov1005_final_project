@@ -138,23 +138,5 @@ schools_ec <- school_ratings %>%
   bind_cols(school_indicators) %>%
   bind_cols(school_coords)
 
-schools_ec <- schools_ec %>%
-  mutate(
-    super_region = case_when(
-      region == 'Banskobystrický' | region == 'Žilinský' ~ 'Central',
-      region == 'Košický' | region == 'Prešovský' ~ 'Eastern',
-      TRUE ~ 'Western'
-    ),
-    pub_pri = case_when(
-      school_board %in% c("Krajský úrad, Okresný úrad",
-                          "Obec",
-                          "Samosprávny kraj") ~ 'Public',
-      school_board %in% c("Súkromník",
-                          "Cirkev, cirkevné spoloèenstvo",
-                          "Obèianske združenia") ~ 'Private',
-      TRUE ~ 'Misc'
-    )
-  )
-
 return(schools_ec)
 }

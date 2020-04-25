@@ -10,6 +10,30 @@ source('helpers.R')
 
 schools_ec <- prep_data()
 
+schools_ec <- schools_ec %>%
+    mutate(
+        super_region = case_when(
+            region == 'Banskobystrický' | region == 'Žilinský' ~ 'Central',
+            region == 'Košický' | region == 'Prešovský' ~ 'Eastern',
+            TRUE ~ 'Western'
+        ),
+        pub_pri = case_when(
+            school_board %in% c("Krajský úrad, Okresný úrad",
+                                "Obec",
+                                "Samosprávny kraj") ~ 'Public',
+            school_board %in% c("Súkromník",
+                                "Cirkev, cirkevné spoloèenstvo",
+                                "Obèianske združenia") ~ 'Private',
+            TRUE ~ 'Misc'
+        ),
+        mat_aj = rowMeans(
+            select(., mat_ajb1, mat_ajb2, mat_ajc1),
+            na.rm = T
+        )
+    )
+
+levels(schools_ec$region)[3] <- 'Trenčiansky'
+
 pr <- schools_ec %>%
     filter(type == 'Základná škola')
 
@@ -42,6 +66,7 @@ regional_hs <- hs %>%
         mat_m = mean(mat_m, na.rm = T),
         mat_mj = mean(mat_mj, na.rm = T),
         mat_s_ja_sl = mean(mat_s_ja_sl, na.rm = T),
+        mat_aj = mean(mat_aj, na.rm = T),
         mat_ajb1 = mean(mat_ajb1, na.rm = T),
         mat_ajb2 = mean(mat_ajb2, na.rm = T),
         mat_ajc1 = mean(mat_ajc1, na.rm = T),
@@ -90,14 +115,17 @@ ui <- navbarPage("Performance of Primary and Secondary Schools in Slovakia",
     
     tabPanel('Regional Inequalities',
              
+        titlePanel('Regional Disparities in Demographic Indicators'),
+             
         sidebarLayout(
             
             sidebarPanel(
                 selectInput('indicator1', "Select a statistic to display",
-                            choices = c('Average monthly salary (€)' = 'income',
-                                           'Unemployment rate (%)' = 'unempl',
-                                           'Population density (logged)' = 'log_dens',
-                                           'Total population' = 'pop')
+                            choices = c('Unemployment rate (%)' = 'unempl',
+                                        'Average monthly salary (€)' = 'income',
+                                        'Population density (logged)' = 'log_dens',
+                                        'Total population' = 'pop'),
+                            selected = 'unempl'
                             )
                 ),
             
@@ -109,9 +137,47 @@ ui <- navbarPage("Performance of Primary and Secondary Schools in Slovakia",
     
     navbarMenu('School Performance',
                
-        tabPanel('Maps'),
-        
-        tabPanel('Visualizations')
+        tabPanel('Maps',
+            titlePanel('Average Educational Outcomes in Each County'),
+            sidebarLayout(
+                sidebarPanel(
+                    selectInput('level1', 'Select school level',
+                                choices = c('Primary schools (grade 1-9)' = 'pr',
+                                            'Secondary schools (grade 10-13)' = 'hs'),
+                                selected = 'pr'),
+                    radioButtons('indicator2', 'Select performance indicator',
+                                 choices = school_map_indicators)
+                ),
+                mainPanel(
+                    leafletOutput('schin_map')
+                )
+            )
+        ),
+
+        tabPanel('Visualizations',
+            titlePanel('Distributions of Educational Outcomes'),
+            sidebarLayout(
+                sidebarPanel(
+                    selectInput('level2', 'Select school level',
+                                choices = c('Primary schools (grade 1-9)' = 'pr',
+                                            'Secondary schools (grade 10-13)' = 'hs'),
+                                selected = 'pr'),
+                    selectInput('indicator3', 'Select performance indicator',
+                                choices = school_gen_indicators,
+                                selected = 'overall_rating'),
+                    checkboxGroupInput('reg1', 'Select regions',
+                                       choices = c('All of Slovakia' = "svk", levels(schools_ec$region))),
+                    conditionalPanel(
+                        condition = "input.reg1 == 'svk'",
+                        selectInput('colind1', 'Color by',
+                                    choices = c('none', 'lol'))
+                    )
+                ),
+                mainPanel(
+                    
+                )
+            )
+        )
     ),
     
     tabPanel('Model'),
@@ -119,7 +185,7 @@ ui <- navbarPage("Performance of Primary and Secondary Schools in Slovakia",
     tabPanel('About')
 )
 
-server <- function(input, output) {
+server <- function(input, output, session) {
     
     output$rin_map <- renderLeaflet({
         
@@ -131,18 +197,98 @@ server <- function(input, output) {
         leaflet(geo_hs) %>%
             addTiles() %>%
             addPolygons(
-                stroke = F,
+                stroke = T,
+                weight = 0.5,
                 fillOpacity = 0.9,
                 smoothFactor = 0.3,
                 fillColor = ~pal_rin(geo_pr %>% pull(input$indicator1)),
-                label = ~paste(county, ': ', round(pull(geo_hs, input$indicator1), 2), sep = '')
+                label = ~paste(county, ': ', round(pull(geo_hs, input$indicator1), 2), sep = ''),
+                highlightOptions = highlightOptions(color = "white", weight = 0.8,
+                                         bringToFront = TRUE)
             ) %>%
             addLegend(
                 position = 'bottomleft',
                 pal = pal_rin,
                 values = ~pull(geo_hs, input$indicator1),
-                title = FALSE,
+                title = F,
                 )
+    })
+    
+    schin1 <- reactive({
+       if(input$level1 == 'pr') school_map_indicators[8:13]
+        else if(input$level1 == 'hs') school_map_indicators[1:7]
+    })
+    
+    output$schin_map <- renderLeaflet({
+        
+       if(input$level1 == 'pr') {
+        pal_schin <- colorNumeric(
+            palette = "YlGn",
+            reverse = F,
+            domain = pull(geo_pr, input$indicator2)
+        )
+        leaflet(geo_pr) %>%
+            addTiles() %>%
+            addPolygons(
+                stroke = T,
+                color = 'black',
+                weight = 0.5,
+                opacity = 1,
+                fillOpacity = 0.9,
+                smoothFactor = 0.3,
+                fillColor = pal_schin(geo_pr %>% pull(input$indicator2)),
+                label = ~paste(county, ': ', 
+                               round(pull(geo_pr, input$indicator2), 2), sep = ''),
+                highlightOptions = highlightOptions(color = "white", weight = 0.8,
+                                                    bringToFront = TRUE)
+            ) %>%
+            addLegend(
+                position = 'bottomleft',
+                pal = pal_schin,
+                values = ~pull(geo_pr, input$indicator2),
+                title = F,
+            )
+       }
+        
+        else if(input$level1 == 'hs') {
+            pal_schin <- colorNumeric(
+                palette = "YlOrRd",
+                reverse = F,
+                domain = pull(geo_hs, input$indicator2)
+            )
+            leaflet(geo_hs) %>%
+                addTiles() %>%
+                addPolygons(
+                    stroke = T,
+                    color = 'black',
+                    weight = 0.5,
+                    opacity = 1,
+                    fillOpacity = 0.9,
+                    smoothFactor = 0.3,
+                    fillColor = pal_schin(geo_hs %>% pull(input$indicator2)),
+                    label = ~paste(county, ': ', 
+                                   round(pull(geo_hs, input$indicator2), 2), sep = ''),
+                    highlightOptions = highlightOptions(color = "white", weight = 0.8,
+                                                        bringToFront = TRUE)
+                ) %>%
+                addLegend(
+                    position = 'bottomleft',
+                    pal = pal_schin,
+                    values = ~pull(geo_hs, input$indicator2),
+                    title = F,
+                )
+        }
+    })
+        
+       schin2 <- reactive({
+            if(input$level2 == 'pr') school_gen_indicators[9:15]
+            else school_gen_indicators[1:8]
+        })
+        
+    
+    observe({
+        updateRadioButtons(session, 'indicator2', choices = schin1())
+        updateSelectInput(session, 'indicator3', choices = schin2())
     })
     
 }
