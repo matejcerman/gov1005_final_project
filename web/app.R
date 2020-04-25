@@ -1,119 +1,18 @@
+# Load packages
+
+library(tidyverse)
+library(janitor)
+library(readxl)
 library(shiny)
 library(shinythemes)
 library(sf)
 library(leaflet)
 library(broom)
 
-source('gather.R')
+load('data.RDATA')
 source('helpers.R')
 
-# Prepare the datasets with summary data
 
-schools_ec <- prep_data()
-
-schools_ec <- schools_ec %>%
-    mutate(
-        super_region = case_when(
-            region == 'Banskobystrický' | region == 'Žilinský' ~ 'Central',
-            region == 'Košický' | region == 'Prešovský' ~ 'Eastern',
-            TRUE ~ 'Western'
-        ),
-        pub_pri = case_when(
-            school_board %in% c("Krajský úrad, Okresný úrad",
-                                "Obec",
-                                "Samosprávny kraj") ~ 'Public',
-            school_board %in% c("Súkromník",
-                                "Cirkev, cirkevné spoloèenstvo",
-                                "Obèianske združenia") ~ 'Private',
-            TRUE ~ 'Misc'
-        ),
-        mat_aj = rowMeans(
-            select(., mat_ajb1, mat_ajb2, mat_ajc1),
-            na.rm = T
-        ),
-        avg_wage = 12*avg_wage/1000,
-        pop_total = pop_total/1000,
-        log_dens = log(pop_density)
-    ) %>%
-    rename(avg_income = avg_wage)
-
-levels(schools_ec$region)[3] <- 'Trenčiansky'
-levels(schools_ec$type)[c(2,3,4)] <- c('Primary', 'College preparatory', 'Vocational')
-
-pr <- schools_ec %>%
-    filter(type == 'Primary')
-
-hs <- schools_ec %>%
-    filter(type == 'Vocational' | type == 'College preparatory')
-
-
-regional_pr <- pr %>%
-    group_by(region, county) %>%
-    summarise(
-        overall_rating = mean(overall_rating, na.rm = T),
-        testovanie9 = mean(testovanie9, na.rm = T),
-        t9_sj = mean(t9_sj, na.rm = T),
-        t9_m = mean(t9_m, na.rm = T),
-        t9_mj = mean(t9_mj, na.rm = T),
-        t9_s_ja_sl = mean(t9_s_ja_sl, na.rm = T),
-        teachers = mean(teachers, na.rm = T),
-        pop_total = mean(pop_total),
-        pop_density = mean(pop_density),
-        log_dens = mean(log_dens),
-        avg_income = mean(avg_income),
-        unemployment_rate = mean(unemployment_rate)
-    )
-    
-regional_hs <- hs %>%
-    group_by(region, county) %>%
-    summarise(
-        overall_rating = mean(overall_rating, na.rm = T),
-        maturity = mean(maturity, na.rm = T),
-        mat_sj = mean(mat_sj, na.rm = T),
-        mat_m = mean(mat_m, na.rm = T),
-        mat_mj = mean(mat_mj, na.rm = T),
-        mat_s_ja_sl = mean(mat_s_ja_sl, na.rm = T),
-        mat_aj = mean(mat_aj, na.rm = T),
-        mat_ajb1 = mean(mat_ajb1, na.rm = T),
-        mat_ajb2 = mean(mat_ajb2, na.rm = T),
-        mat_ajc1 = mean(mat_ajc1, na.rm = T),
-        teachers = mean(teachers, na.rm = T),
-        pop_total = mean(pop_total),
-        pop_density = mean(pop_density),
-        log_dens = mean(log_dens),
-        avg_income = mean(avg_income),
-        unemployment_rate = mean(unemployment_rate)
-    )
-
-# Create datasets for mapping
-
-create_mapping_data <- function(data_by_county) {
-    geo <- st_read('raw_data/shapefiles/SVK_adm2.shp') %>%
-        mutate(NAME_2 = as.character(NAME_2)) %>%
-        mutate(NAME_2 = case_when(
-            NAME_2 == 'Bytca' ~ 'Bytča',
-            NAME_2 == 'Cadca' ~ 'Čadca',
-            NAME_2 == 'Turcianske Teplice' ~ 'Turčianske Teplice',
-            NAME_2 == 'Lucenec' ~ 'Lučenec',
-            NAME_2 == 'Šala' ~ 'Šaľa',
-            NAME_2 == 'Topolcany' ~ 'Topoľčany',
-            NAME_2 == 'Levoca' ~ 'Levoča',
-            NAME_2 == 'Stará Lubovna' ~ 'Stará Ľubovňa',
-            NAME_2 == 'Trencín' ~ 'Trenčín',
-            NAME_2 == 'Pieštany' ~ 'Piešťany',
-            NAME_2 == 'Velký Krtíš' ~ 'Veľký Krtíš',
-            NAME_2 == 'Rožnava' ~ 'Rožňava',
-            NAME_2 == 'Vranov nad Toplou' ~ 'Vranov nad Topľou',
-            NAME_2 == 'Košice-okolie' ~ 'Košice - okolie',
-            TRUE ~ NAME_2
-        )) %>%
-        mutate(county = as.factor(NAME_2)) %>%
-        full_join(data_by_county, by = 'county')
-    return(geo)
-}
-
-geo_pr <- create_mapping_data(regional_pr)
-geo_hs <- create_mapping_data(regional_hs)
 
 # Shiny web application UI
 
@@ -256,7 +155,7 @@ ui <- navbarPage('Regional Inequality in Slovak Education',
             h2('Data'),
             
             'The project relies on', tags$a(href = 'http://skoly.sme.sk/metodika/#data',
-                                           'data from INEKO'),
+                                           'data from INEKO,'),
             "an NGO which rates all primary and secondary schools in Slovakia (provided that
             they hava sufficient number of students, meaning that extremely small schools are
             excluded from the data. INEKO's methodology uses a weigted average of several metrics,
@@ -277,7 +176,7 @@ ui <- navbarPage('Regional Inequality in Slovak Education',
                    'Cerative Commons 4.0 Attribution International'),
             'licence.',
             h2('About me'),
-            "My name is Matej Cerman and I'm a student at Harvard University, hailing from Slovakia. I
+            "My name is Matej Cerman and I'm a Harvard University student hailing from Slovakia. I
             study Applied Math and Economics, hoping to use quantitative approaches to find new insights
             into social science problems. Please contact me with any feedback or suggestions at 
             matej_cerman@college.harvard.edu. You can find the code for this project on",

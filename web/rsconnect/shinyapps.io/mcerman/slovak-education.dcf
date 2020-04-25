@@ -1,0 +1,13 @@
+name: slovak-education
+title: slovak-education
+username:
+account: mcerman
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 2186133
+bundleId: 3064831
+url: https://mcerman.shinyapps.io/slovak-education/
+when: 1587853118.25336
+asMultiple: FALSE
+asStatic: FALSE
+ignoredFiles: explore.Rmd|gather.R|raw_data
