@@ -117,7 +117,8 @@ geo_hs <- create_mapping_data(regional_hs)
 
 # Shiny web application UI
 
-ui <- navbarPage("Performance of Primary and Secondary Schools in Slovakia",
+ui <- navbarPage('Regional Inequality in Slovak Education',
+                 theme = shinytheme('flatly'),
     tabPanel('Regional Inequalities',
         titlePanel('Regional Disparities in Demographic Indicators'),
         sidebarLayout(
@@ -223,7 +224,6 @@ ui <- navbarPage("Performance of Primary and Secondary Schools in Slovakia",
     
     tabPanel('About',
         h1('Regional Inequality in Slovak Education', align = "center"),
-        br(),
         fluidRow(column(2), column(8,
             h2('Context'),
                                    
@@ -250,11 +250,44 @@ ui <- navbarPage("Performance of Primary and Secondary Schools in Slovakia",
             sizes. Both directions of causality (and a myriad of potential confounding variables) 
             can be plausibly imagined: students from more advantaged backgrounds might have more resources
             to succeed academically, but better schools might also contribute to an economic upliftment
-            in their region.',
+            in their region. In the future, I would like to include time series data for the relevant
+            metrics to observe trends over time.',
             
             h2('Data'),
             
-            'The project relies on [aje](http://skoly.sme.sk/metodika/#data) data from INEKO'
+            'The project relies on', tags$a(href = 'http://skoly.sme.sk/metodika/#data',
+                                           'data from INEKO'),
+            "an NGO which rates all primary and secondary schools in Slovakia (provided that
+            they hava sufficient number of students, meaning that extremely small schools are
+            excluded from the data. INEKO's methodology uses a weigted average of several metrics,
+            including standardized testing performance, alumni job prospects, and the school's resources.
+            Schools are compared against other schools of the same type and a formula is used to produce
+            a final 0-10 rating. The socioeconomic indicators that the project looks at come from the 
+            Slovak Government's offices:",
+            tags$a(href = 'https://bit.ly/2Kw4OLl',
+                   'population density data'),
+            'and',
+            tags$a(href = 'https://bit.ly/2Y4xsv1',
+                   'average monthly salary data'),
+            'from the Slovak Statistical Office,',
+            tags$a(href = 'https://www.upsvr.gov.sk/statistiky/nezamestnanost-mesacne-statistiky/2020.html?page_id=971502',
+                   'and unemployment rates'),
+            'from the Bureau of Labor. They are available under the',
+            tags$a(href = 'http://creativecommons.org/licenses/by/4.0/',
+                   'Cerative Commons 4.0 Attribution International'),
+            'licence.',
+            h2('About me'),
+            "My name is Matej Cerman and I'm a student at Harvard University, hailing from Slovakia. I
+            study Applied Math and Economics, hoping to use quantitative approaches to find new insights
+            into social science problems. Please contact me with any feedback or suggestions at 
+            matej_cerman@college.harvard.edu. You can find the code for this project on",
+            tags$a(href = 'https://github.com/matejcerman/gov1005_final_project',
+                   'my GitHub.'),
+            br(),
+            br(),
+            br(),
+            br(),
+            br()
         )
         )
     )
