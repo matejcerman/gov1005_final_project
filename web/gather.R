@@ -138,15 +138,6 @@ schools_ec <- school_ratings %>%
   bind_cols(school_indicators) %>%
   bind_cols(school_coords)
 
-return(schools_ec)
-}
-
-# Use the function to load in the master dataset
-
-schools_ec <- prep_data()
-
-# Create new helper variables for modeling
-
 schools_ec <- schools_ec %>%
   mutate(
     super_region = case_when(
@@ -165,8 +156,5 @@ schools_ec <- schools_ec %>%
     )
   )
 
-hs <- schools_ec %>%
-  filter(type == 'Stredná odborná škola' | type == 'Gymnázium')
-
-pr <- schools_ec %>%
-  filter(type == 'Základná škola')
+return(schools_ec)
+}
