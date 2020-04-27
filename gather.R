@@ -253,3 +253,5 @@ create_mapping_data <- function(data_by_county) {
 
 geo_pr <- create_mapping_data(regional_pr)
 geo_hs <- create_mapping_data(regional_hs)
+
+save(schools_ec, pr, hs, regional_pr, regional_hs, geo_pr, geo_hs, file = 'web/data.RDATA')
