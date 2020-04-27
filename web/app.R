@@ -1,4 +1,4 @@
-# Load packages
+# Load all packages
 
 library(tidyverse)
 library(janitor)
@@ -9,15 +9,26 @@ library(sf)
 library(leaflet)
 library(broom)
 
+# Load in the data saved by the gather.R file to make all environment objects
+# available for the shiny app
+
 load('data.RDATA')
+
+# Load in the objects that serve as menu choices. I stored them in a separate
+# file to unclutter the UI code.
+
 source('helpers.R')
 
-
-
-# Shiny web application UI
+# Shiny UI consisting of a menu bar at the top. Using the Flatly theme for now,
+# might change to something else in the future
 
 ui <- navbarPage('Regional Inequality in Slovak Education',
                  theme = shinytheme('flatly'),
+                 
+# First panel contains a sidebar menu which allows the user to select a
+# demographic indicator that they want to visualize on a map. The main panel
+# shows a colored map of Slovakia for the appropriate statistic
+                 
     tabPanel('Regional Inequalities',
         titlePanel('Regional Disparities in Demographic Indicators'),
         sidebarLayout(
@@ -36,8 +47,14 @@ ui <- navbarPage('Regional Inequality in Slovak Education',
           )
         ),
     
+# Second button on the menu allows the user to select from two sub-panels
+
     navbarMenu('School Performance',
                
+# Sidebar menu lets the user choose between primary and secondary schools
+# (dropdown menu) and then which school quality metric they want to visualize
+# (buttons). Main panel shown a map of the chosen metric
+
         tabPanel('Maps',
             titlePanel('Average Educational Outcomes in Each County'),
             sidebarLayout(
@@ -54,6 +71,13 @@ ui <- navbarPage('Regional Inequality in Slovak Education',
                 )
             )
         ),
+
+# Sidebar menu gives the user several choices. First of all, the user chooses
+# between primary and secondary schools, and then a quality metric. If the user
+# decides to create a plot for all of Slovakia, the app allows for coloring by
+# muliple categories. If the user wants to see specific regions, this is not
+# possible (too few data points for meaningful categorization), but checkboxes
+# appear, allowing the user to select any combination of the 8 regions
 
         tabPanel('Visualizations',
             titlePanel('Distributions of Educational Outcomes'),
@@ -84,16 +108,29 @@ ui <- navbarPage('Regional Inequality in Slovak Education',
                                     selected = 'no')
                     )
                 ),
+                
+# Main panel shows a histogram with the parameters inputted by the user
+                
                 mainPanel(
                     plotOutput('schplot')
                 )
             )
         )
     ),
-    
+
+# Last data panel shows bivariate models. I'm planning to add models other than
+# simple linear regression in the future
+
     tabPanel('Model',
         headerPanel('Visualize simple linear models'),
         fluidRow(
+            
+# The user is presented with a menu where they can select between primary and
+# secondary schools and then choose whether they want individual datapoints to
+# represent individual schools or county averages. After this, the user chooses
+# an explanatory variable (socioeconomic factor) and a reponse variable (school
+# quality metric)
+            
             column(3,
                    selectInput('level3', 'Select school level',
                                choices = c('Primary schools (grade 1-9)' = 'pr',
@@ -112,15 +149,23 @@ ui <- navbarPage('Regional Inequality in Slovak Education',
                                            'Teachers per 100 students' = 'teachers'),
                                selected = 'avg_income')
                 ),
+            
+# Output shows a scatterplot with a best-fit line for the chosen variables.
+            
             column(6,
                 plotOutput('modplot1')
             ),
+
+# Output shows a table with regression coefficients.
+
             column(3,
                 tableOutput('tab1')
             )
         )
     ),
     
+# Panel with explanatory text
+
     tabPanel('About',
         h1('Regional Inequality in Slovak Education', align = "center"),
         fluidRow(column(2), column(8,
@@ -192,7 +237,13 @@ ui <- navbarPage('Regional Inequality in Slovak Education',
     )
 )
 
+# The server of the shiny app
+
 server <- function(input, output, session) {
+    
+# Map of the chosen socioeconomic indicator. First, it creates a color pallete
+# scaled for the appropriate variable and then applies it to a leaflet map with
+# Slovak counties as polygons
     
     output$rin_map <- renderLeaflet({
         
@@ -221,10 +272,16 @@ server <- function(input, output, session) {
                 )
     })
     
+# Choose appropriate school quality indicators depending on whether the user
+# select primary or secondary schools
+    
     schin1 <- reactive({
        if(input$level1 == 'pr') school_map_indicators[8:13]
         else if(input$level1 == 'hs') school_map_indicators[1:7]
     })
+    
+# Render a leaflet county-level map with county averages of school performance
+# metrics for primary schools.
     
     output$schin_map <- renderLeaflet({
         
@@ -257,6 +314,9 @@ server <- function(input, output, session) {
             )
        }
         
+# Render a leaflet county-level map with county averages of school performance
+# metrics for secondary schools.
+        
         else if(input$level1 == 'hs') {
             pal_schin <- colorNumeric(
                 palette = "YlOrRd",
@@ -286,13 +346,22 @@ server <- function(input, output, session) {
                 )
         }
     })
-        
+      
+# Choose appropriate school quality indicators depending on whether the user
+# select primary or secondary schools
+      
     schin2 <- reactive({
             if(input$level2 == 'pr') school_gen_indicators[9:15]
             else school_gen_indicators[1:8]
         })
-       
+    
+# Histograms of school performance metrics
+    
     output$schplot <- renderPlot({
+        
+# If the user wants to see plots for primary schools for all of Slovakia, show
+# either a plain histogram or color it by their chosen category
+        
         if (input$level2 == 'pr'){
             if(input$reg1 == 'svk') {
                 if(input$colind1 == 'no') {
@@ -306,6 +375,10 @@ server <- function(input, output, session) {
                             geom_histogram()
                     }
             }
+            
+# If the user wants to see regional plots, color and facet the histograms by
+# region after filtering the data for only selected regions
+            
             else if(input$reg1 == 'regs') {
                 req(input$reg2)
                 pr %>%
@@ -314,7 +387,10 @@ server <- function(input, output, session) {
                     geom_histogram(aes(fill = region)) +
                     facet_wrap(~region)
                 }
-            }
+        }
+        
+# If the user wants to see plots for secondary schools for all of Slovakia, show
+# either a plain histogram or color it by their chosen category
                     
         else if(input$level2 == 'hs') {
             if(input$reg1 == 'svk') {
@@ -329,6 +405,10 @@ server <- function(input, output, session) {
                         geom_histogram()
                 }
             }
+            
+# If the user wants to see regional plots, color and facet the histograms by
+# region after filtering the data for only selected regions
+            
             else if(input$reg1 == 'regs') {
                 req(input$reg2)
                 hs %>%
@@ -340,12 +420,23 @@ server <- function(input, output, session) {
         }
     })
     
+# Update choices based on whether the user wants to see primary or secondary
+# schools
+    
     schin3 <- reactive({
         if(input$level3 == 'pr') school_model_indicators[8:13]
         else school_gen_indicators[1:7]
     })
     
+# Display scatterplots
+    
     output$modplot1 <- renderPlot({
+        
+# If the user wants to see primary school data, then show a scatterplot of their
+# chosen explanatory and response variable for either individual schools or
+# county averages. Add a best-fit line to the data and color the points by
+# region
+
         if (input$level3 == 'pr') {
             if (input$scope1 == 'county') {
                 regional_pr %>%
@@ -360,6 +451,12 @@ server <- function(input, output, session) {
                     geom_smooth(method = 'lm', se = F)
             }
         }
+        
+# If the user wants to see secondary school data, then show a scatterplot of
+# their chosen explanatory and response variable for either individual schools
+# or county averages. Add a best-fit line to the data and color the points by
+# region
+        
         else {
             if (input$scope1 == 'county') {
                 regional_hs %>%
@@ -376,7 +473,12 @@ server <- function(input, output, session) {
         }
     })
     
+# Render a table with regression coefficients
+    
     output$tab1 <- renderTable({
+        
+# Include either school-level or county level data for primary schools, create a
+# simple linear model based on the user's selected variables.
         
         if (input$level3 == 'pr') {
             if (input$scope1 == 'county') {
@@ -392,6 +494,10 @@ server <- function(input, output, session) {
                     select(term, estimate, std.error)
             }
         }
+        
+# Include either school-level or county level data for secondary schools, create a
+# simple linear model based on the user's selected variables.
+        
         else {
             if (input$scope1 == 'county') {
                 regional_hs %>%
@@ -408,15 +514,18 @@ server <- function(input, output, session) {
         }
     })
     
-    observe({
+# Function updates the menus of performance indicators based on the user's
+# choice of primary or secondary schools.
+    
+observe({
         updateRadioButtons(session, 'indicator2', choices = schin1())
         updateSelectInput(session, 'indicator3', choices = schin2())
         updateSelectInput(session, 'resp1', choices = schin3())
-    })
+        })
     
 }
 
-# Run the application 
+# Run the shiny app (yay!) 
 shinyApp(ui = ui, server = server)
 
 

@@ -4,5 +4,5 @@
 .Ruserdata
 
 *.Rproj
-web/rsconnect/
+web/rsconnect
 explore.Rmd

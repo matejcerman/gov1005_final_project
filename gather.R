@@ -1,4 +1,4 @@
-# Load packages
+# Load all packages
 
 library(tidyverse)
 library(janitor)
@@ -8,6 +8,11 @@ library(shinythemes)
 library(sf)
 library(leaflet)
 library(broom)
+
+# Create a large function that will output the master dataset for further
+# analysis. I decided to make this a function in order not to clutter my
+# environment with tons of intermediate tibbles - now they only get created
+# within the function
 
 prep_data <- function() {
 
@@ -64,18 +69,20 @@ school_indicators <- read_slovak_csv(
 
 school_coords <- read_slovak_csv(
   'raw_data/zoznam_skol.csv',
-  
   col_types = 'dffffffccffdddddddccccdfffff'
 ) %>%
+  
+  # Rename latitude and longtitude data and only keep these two columns
+  
   select(sur_x, sur_y) %>%
   rename(
     lng = sur_x,
     lat = sur_y
   )
 
-# Load in the two forms of economic data for all counties and manipulate the
-# county names so that they match. I also remove iformation about regions that
-# are not counties from the unemployment dataset
+# Load in data about population density in each county. It only includes county
+# names in every second row, and features both population and density data, so I
+# rename the rows and tidy up the tibble
 
 density <- read_slovak_csv('raw_data/density.csv',
                            col_names = c('county', 'indicator', 'value'),
@@ -96,6 +103,9 @@ for (i in 1:nrow(density)) {
 density <- density %>%
   pivot_wider(names_from = 'indicator', values_from = 'value')
 
+# Load in data about the average monthly wage in each county, rename counties to
+# match other tibbles, and join to the density data
+
 wages <- read_slovak_csv("raw_data/wages.csv",
                              skip = 3,
                              col_names = c("county_broken", "type", "avg_wage"),
@@ -106,6 +116,9 @@ wages <- read_slovak_csv("raw_data/wages.csv",
   
 wages_density <- wages %>%
   full_join(density, by = 'county')
+
+# Read in an excel sheet with county-level unemployment data, only keep rows
+# which correpond to counties (not regions or the whole nation)
 
 unemployment <- read_xlsx(
   "raw_data/unemployment.xlsx",
@@ -122,8 +135,7 @@ unemployment <- read_xlsx(
          !str_detect(county, 'Slovensko'),
          !str_detect(county, 'Pozn'))
 
-# Join the two datasets into one tibble that will store both kinds of economic
-# data
+# Join all of the indicators into one dataset with economic data
 
 ec_data <- unemployment %>%
   bind_cols(wages_density) %>%
@@ -143,12 +155,18 @@ schools_ec <- school_ratings %>%
   bind_cols(school_indicators) %>%
   bind_cols(school_coords)
 
+# End of the fucntion. Only output the single resulting tibble.
+
 return(schools_ec)
 }
 
-# Prepare the datasets with summary data
+# Use the function to create the master dataset
 
 schools_ec <- prep_data()
+
+# Create new columns that will be useful for analysis: broader regions,
+# public/private school type. Also combine the 3 levels of English leaving exams
+# into one and multiply monthly wages by 12 to get the yearly incomes
 
 schools_ec <- schools_ec %>%
   mutate(
@@ -176,8 +194,12 @@ schools_ec <- schools_ec %>%
   ) %>%
   rename(avg_income = avg_wage)
 
+# Fix and translate broken values
+
 levels(schools_ec$region)[3] <- 'Trenčiansky'
 levels(schools_ec$type)[c(2,3,4)] <- c('Primary', 'College preparatory', 'Vocational')
+
+# Split into primary and secondary schools datasets
 
 pr <- schools_ec %>%
   filter(type == 'Primary')
@@ -185,6 +207,7 @@ pr <- schools_ec %>%
 hs <- schools_ec %>%
   filter(type == 'Vocational' | type == 'College preparatory')
 
+# Create county-level regional summaries for primary and secondary schools
 
 regional_pr <- pr %>%
   group_by(region, county) %>%
@@ -224,7 +247,8 @@ regional_hs <- hs %>%
     unemployment_rate = mean(unemployment_rate)
   )
 
-# Create datasets for mapping
+# Function which loads in shapefiles for Slovakia, fixes misspeled values, and
+# joins it with a county-level summmary dataset
 
 create_mapping_data <- function(data_by_county) {
   geo <- st_read('raw_data/shapefiles/SVK_adm2.shp') %>%
@@ -251,7 +275,12 @@ create_mapping_data <- function(data_by_county) {
   return(geo)
 }
 
+# Use the function to create geograpical summaries for mapping. One for primary,
+# one for secondary schools
+
 geo_pr <- create_mapping_data(regional_pr)
 geo_hs <- create_mapping_data(regional_hs)
+
+# Save all the outputs for future use
 
 save(schools_ec, pr, hs, regional_pr, regional_hs, geo_pr, geo_hs, file = 'web/data.RDATA')
