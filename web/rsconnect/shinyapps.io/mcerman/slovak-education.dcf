@@ -5,9 +5,9 @@ account: mcerman
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 2186133
-bundleId: 3064831
+bundleId: 3065060
 url: https://mcerman.shinyapps.io/slovak-education/
-when: 1587853118.25336
+when: 1587858436.51161
 asMultiple: FALSE
 asStatic: FALSE
 ignoredFiles: explore.Rmd|gather.R|raw_data

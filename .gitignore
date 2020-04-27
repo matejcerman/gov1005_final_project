@@ -4,6 +4,5 @@
 .Ruserdata
 
 *.Rproj
-raw_data/INEKO/old
-
-ms_6/rsconnect/
+web/rsconnect/
+explore.Rmd
