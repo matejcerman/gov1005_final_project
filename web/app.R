@@ -8,6 +8,7 @@ library(shinythemes)
 library(sf)
 library(leaflet)
 library(broom)
+library(scales)
 
 # Load in the data saved by the gather.R file to make all environment objects
 # available for the shiny app
@@ -36,10 +37,12 @@ ui <- navbarPage('Regional Inequality in Slovak Education',
                 selectInput('indicator1', "Select a statistic to display",
                             choices = c('Unemployment rate (%)' = 'unemployment_rate',
                                         'Average gross income (in € thousands)' = 'avg_income',
-                                        'Population density (logged)' = 'log_dens',
+                                        'Population density (per km^2, logged)' = 'log_dens',
                                         'Total population (in 1000s)' = 'pop_total'),
                             selected = 'unempl'
-                            )
+                            ),
+                'The map  on the right shows the value of the selected indicator in all 79 
+                Slovak counties. Hover over a county to see its name and the exact value.'
                 ),
             mainPanel(
                 leafletOutput('rin_map')
@@ -64,7 +67,11 @@ ui <- navbarPage('Regional Inequality in Slovak Education',
                                             'Secondary schools (grade 10-13)' = 'hs'),
                                 selected = 'pr'),
                     radioButtons('indicator2', 'Select performance indicator',
-                                 choices = school_map_indicators)
+                                 choices = school_map_indicators),
+                    'The map on the right displays the per-county averages of different
+                    measures of educational outcomes. You can select whether to look at
+                    primary or secondary schools in the menu at the top. Hover over the
+                    map to see the name of a county and the average value.'
                 ),
                 mainPanel(
                     leafletOutput('schin_map')
@@ -203,23 +210,26 @@ ui <- navbarPage('Regional Inequality in Slovak Education',
                                            'data from INEKO,'),
             "an NGO which rates all primary and secondary schools in Slovakia (provided that
             they hava sufficient number of students, meaning that extremely small schools are
-            excluded from the data. INEKO's methodology uses a weigted average of several metrics,
+            excluded from the data). INEKO's methodology uses a weigted average of several metrics,
             including standardized testing performance, alumni job prospects, and the school's resources.
             Schools are compared against other schools of the same type and a formula is used to produce
-            a final 0-10 rating. The socioeconomic indicators that the project looks at come from the 
+            a final 0-10 rating. The data on schools comes from the 2018/2019 academic year.
+            The socioeconomic indicators that the project looks at come from the 
             Slovak Government's offices:",
             tags$a(href = 'https://bit.ly/2Kw4OLl',
-                   'population density data'),
+                   'population density data (2019)'),
             'and',
             tags$a(href = 'https://bit.ly/2Y4xsv1',
-                   'average monthly salary data'),
+                   'average monthly salary data (2019)'),
             'from the Slovak Statistical Office,',
             tags$a(href = 'https://www.upsvr.gov.sk/statistiky/nezamestnanost-mesacne-statistiky/2020.html?page_id=971502',
-                   'and unemployment rates'),
+                   'and unemployment rates (March 2020)'),
             'from the Bureau of Labor. They are available under the',
             tags$a(href = 'http://creativecommons.org/licenses/by/4.0/',
                    'Cerative Commons 4.0 Attribution International'),
             'licence.',
+            'The geospatial data for Slovak counties is from',
+            tags$a(href = 'https://www.diva-gis.org/datadown', 'DIVA-GIS'),
             h2('About me'),
             "My name is Matej Cerman and I'm a Harvard University student hailing from Slovakia. I
             study Applied Math and Economics, hoping to use quantitative approaches to find new insights
@@ -241,7 +251,7 @@ ui <- navbarPage('Regional Inequality in Slovak Education',
 
 server <- function(input, output, session) {
     
-# Map of the chosen socioeconomic indicator. First, it creates a color pallete
+# Map of the chosen socioeconomic indicator. First, it creates a color pallette
 # scaled for the appropriate variable and then applies it to a leaflet map with
 # Slovak counties as polygons
     
@@ -251,6 +261,13 @@ server <- function(input, output, session) {
             palette = "plasma",
             reverse = TRUE,
             domain = pull(geo_hs, input$indicator1))
+        
+        suf1 <- case_when(
+          input$indicator1 == 'unemployment_rate' ~ '%',
+          input$indicator1 == 'avg_income' ~ " 000 €",
+          input$indicator1 == 'log_dens' ~ "( /km^2, logged)",
+          input$indicator1 == 'pop_total' ~ " 000"
+        )
         
         leaflet(geo_hs) %>%
             addTiles() %>%
@@ -269,7 +286,10 @@ server <- function(input, output, session) {
                 pal = pal_rin,
                 values = ~pull(geo_hs, input$indicator1),
                 title = F,
+                labFormat = labelFormat(
+                  suffix = suf1
                 )
+            )
     })
     
 # Choose appropriate school quality indicators depending on whether the user
@@ -284,8 +304,28 @@ server <- function(input, output, session) {
 # metrics for primary schools.
     
     output$schin_map <- renderLeaflet({
+      
+      # Dynamically change the suffix of the legend to have correct units
+      
+      suf2 <- case_when(
+        input$indicator2 == 'overall_rating' ~ '',
+        input$indicator2 == 'maturity' ~ '',
+        input$indicator2 == 'mat_sj' ~ '%',
+        input$indicator2 == 'mat_m' ~ '%',
+        input$indicator2 == 'mat_aj' ~ '%',
+        input$indicator2 == 'mat_mj' ~ '%',
+        input$indicator2 == 'mat_s_ja_sl' ~ '%',
+        input$indicator2 == 'testovanie9' ~ '',
+        input$indicator2 == 't9_sj' ~ '%',
+        input$indicator2 == 't9_m' ~ '%',
+        input$indicator2 == 't9_mj' ~ '%',
+        input$indicator2 == 't9_s_ja_sl' ~ '%'
+      )
         
        if(input$level1 == 'pr') {
+         
+        req(input$indicator2 %in% colnames(geo_pr))
+         
         pal_schin <- colorNumeric(
             palette = "YlGn",
             reverse = F,
@@ -311,6 +351,9 @@ server <- function(input, output, session) {
                 pal = pal_schin,
                 values = ~pull(geo_pr, input$indicator2),
                 title = F,
+                labFormat = labelFormat(
+                  suffix = suf2
+                )
             )
        }
         
@@ -318,6 +361,9 @@ server <- function(input, output, session) {
 # metrics for secondary schools.
         
         else if(input$level1 == 'hs') {
+          
+          req(input$indicator2 %in% colnames(geo_hs))
+          
             pal_schin <- colorNumeric(
                 palette = "YlOrRd",
                 reverse = F,
@@ -343,6 +389,9 @@ server <- function(input, output, session) {
                     pal = pal_schin,
                     values = ~pull(geo_hs, input$indicator2),
                     title = F,
+                    labFormat = labelFormat(
+                      suffix = suf2
+                    )
                 )
         }
     })
@@ -358,21 +407,59 @@ server <- function(input, output, session) {
 # Histograms of school performance metrics
     
     output$schplot <- renderPlot({
-        
+      
+      
+# Dynamically change the x-label and the label for fill color
+      
+      xlab <- case_when(
+        input$indicator3 == 'overall_rating' ~ 'Overall school rating (0-10)',
+        input$indicator3 == 'maturity' ~ 'Leaving examination preformance rating (0-10)',
+        input$indicator3 == 'mat_sj' ~ 'Average leaving exam score: Slovak language (%)',
+        input$indicator3 == 'mat_m' ~ 'Average leaving exam score: Math (%)',
+        input$indicator3 == 'mat_aj' ~ 'Average leaving exam score: English language (%)',
+        input$indicator3 == 'mat_mj' ~ 'Average leaving exam score: Hungarian language  (%)',
+        input$indicator3 == 'mat_s_ja_sl' ~ 'Average leaving exam score: Slovak as second language (%)',
+        input$indicator3 == 'teachers' ~ 'Teachers per 100 students',
+        input$indicator3 == 'testovanie9' ~ 'Grade 9 standardized test performance rating (0-10)' ,
+        input$indicator3 == 't9_sj' ~ 'Grade 9 test score: Slovak Language (%)',
+        input$indicator3 == 't9_m' ~ 'Grade 9 test score: Math (%)',
+        input$indicator3 == 't9_mj' ~ 'Grade 9 test score: Hungarian Language (%)',
+        input$indicator3 == 't9_s_ja_sl' ~ 'Grade 9 test score: Slovak as second language (%)'
+      )
+      
+      filllab <- case_when(
+        input$colind1 == 'super_region' ~ 'Major region',
+        input$colind1 == 'region' ~ 'Administrative region',
+        input$colind1 == 'type' ~ 'School type',
+        input$colind1 == 'pub_pri' ~ 'Public or private'
+      )
+      
 # If the user wants to see plots for primary schools for all of Slovakia, show
 # either a plain histogram or color it by their chosen category
         
         if (input$level2 == 'pr'){
             if(input$reg1 == 'svk') {
                 if(input$colind1 == 'no') {
-                    pr %>%
-                        ggplot(aes_string(x = input$indicator3)) +
-                        geom_histogram()
+                  pr %>%
+                    ggplot(aes_string(x = input$indicator3)) +
+                    geom_histogram() +
+                    scale_x_continuous(breaks = pretty_breaks(n = 10)) +
+                    theme_classic() +
+                    labs(
+                      x = xlab,
+                      y = 'Count'
+                    )
                 }
                     else if(!input$colind1 == 'no') {
-                        pr %>%
-                            ggplot(aes_string(x = input$indicator3, fill = input$colind1)) +
-                            geom_histogram()
+                      pr %>%
+                        ggplot(aes_string(x = input$indicator3, fill = input$colind1)) +
+                        geom_histogram() +
+                        theme_classic() +
+                        labs(
+                          x = xlab,
+                          y = 'Count',
+                          fill = filllab
+                        )
                     }
             }
             
@@ -380,13 +467,17 @@ server <- function(input, output, session) {
 # region after filtering the data for only selected regions
             
             else if(input$reg1 == 'regs') {
-                req(input$reg2)
-                pr %>%
-                    filter(region %in% input$reg2) %>%
-                    ggplot(aes_string(x = input$indicator3)) +
-                    geom_histogram(aes(fill = region)) +
-                    facet_wrap(~region)
-                }
+              req(input$reg2)
+              pr %>%
+                filter(region %in% input$reg2) %>%
+                ggplot(aes_string(x = input$indicator3)) +
+                geom_histogram(aes(fill = region)) +
+                facet_wrap(~region) +
+                labs(
+                  x = xlab,
+                  y = 'Count'
+                )
+            }
         }
         
 # If the user wants to see plots for secondary schools for all of Slovakia, show
@@ -395,14 +486,25 @@ server <- function(input, output, session) {
         else if(input$level2 == 'hs') {
             if(input$reg1 == 'svk') {
                 if(input$colind1 == 'no') {
-                    hs %>%
-                        ggplot(aes_string(x = input$indicator3)) +
-                        geom_histogram()
+                  hs %>%
+                    ggplot(aes_string(x = input$indicator3)) +
+                    geom_histogram() +
+                    theme_classic() +
+                    labs(
+                      x = xlab,
+                      y = 'Count'
+                    )
                 }
                 else if(!input$colind1 == 'no') {
-                    hs %>%
-                        ggplot(aes_string(x = input$indicator3, fill = input$colind1)) +
-                        geom_histogram()
+                  hs %>%
+                    ggplot(aes_string(x = input$indicator3, fill = input$colind1)) +
+                    geom_histogram() +
+                    theme_classic() +
+                    labs(
+                      x = xlab,
+                      y = 'Count',
+                      fill = filllab
+                    )
                 }
             }
             
@@ -415,7 +517,11 @@ server <- function(input, output, session) {
                     filter(region %in% input$reg2) %>%
                     ggplot(aes_string(x = input$indicator3)) +
                     geom_histogram(aes(fill = region)) +
-                    facet_wrap(~region)
+                    facet_wrap(~region) +
+                  labs(
+                    x = xlab,
+                    y = 'Count'
+                  )
             }
         }
     })
@@ -431,6 +537,31 @@ server <- function(input, output, session) {
 # Display scatterplots
     
     output$modplot1 <- renderPlot({
+      
+# Dynamic x and y labels
+      
+      xlab <- case_when(
+        input$expl1 == 'avg_income' ~ "Average gross income ('000 €)",
+        input$expl1 == 'unemployment_rate' ~ 'County unemployment rate (%)',
+        input$expl1 == 'log_dens' ~ 'County population density (/km^2, logged)',
+        input$expl1 == 'pop_total' ~ "Total county population ('000)",
+        input$expl1 == 'teachers' ~ 'Teachers per 100 students'
+      )
+      
+      ylab <- case_when(
+        input$resp1 == 'overall_rating' ~ 'Overall school rating (0-10)',
+        input$resp1 == 'maturity' ~ 'Leaving examination preformance rating (0-10)',
+        input$resp1 == 'mat_sj' ~ 'Average leaving exam score: Slovak language (%)',
+        input$resp1 == 'mat_m' ~ 'Average leaving exam score: Math (%)',
+        input$resp1 == 'mat_aj' ~ 'Average leaving exam score: English language (%)',
+        input$resp1 == 'mat_mj' ~ 'Average leaving exam score: Hungarian language  (%)',
+        input$resp1 == 'mat_s_ja_sl' ~ 'Average leaving exam score: Slovak as second language (%)',
+        input$resp1 == 'testovanie9' ~ 'Grade 9 standardized test performance rating (0-10)' ,
+        input$resp1 == 't9_sj' ~ 'Grade 9 test score: Slovak Language (%)',
+        input$resp1 == 't9_m' ~ 'Grade 9 test score: Math (%)',
+        input$resp1 == 't9_mj' ~ 'Grade 9 test score: Hungarian Language (%)',
+        input$resp1 == 't9_s_ja_sl' ~ 'Grade 9 test score: Slovak as second language (%)'
+      )
         
 # If the user wants to see primary school data, then show a scatterplot of their
 # chosen explanatory and response variable for either individual schools or
@@ -439,16 +570,38 @@ server <- function(input, output, session) {
 
         if (input$level3 == 'pr') {
             if (input$scope1 == 'county') {
-                regional_pr %>%
-                    ggplot(aes_string(input$expl1, input$resp1)) +
-                    geom_point(aes(color = region), alpha = 0.8, size = 3) +
-                    geom_smooth(method = 'lm', se = F)
+              
+              req(input$expl1 %in% colnames(regional_pr))
+              req(input$resp1 %in% colnames(regional_pr))
+              
+              regional_pr %>%
+                ggplot(aes_string(input$expl1, input$resp1)) +
+                geom_point(aes(color = region), alpha = 0.8, size = 3) +
+                geom_smooth(method = 'lm', se = F) +
+                scale_x_continuous(breaks = pretty_breaks(n = 8)) +
+                labs(
+                  x = xlab,
+                  y = ylab,
+                  color = 'Administrative region'
+                ) +
+                theme_bw()
             }
             else {
-                pr %>%
-                    ggplot(aes_string(input$expl1, input$resp1)) +
-                    geom_point(aes(color = region), alpha = 0.6, size = 1.5) +
-                    geom_smooth(method = 'lm', se = F)
+              
+              req(input$expl1 %in% colnames(pr))
+              req(input$resp1 %in% colnames(pr))
+              
+              pr %>%
+                ggplot(aes_string(input$expl1, input$resp1)) +
+                geom_point(aes(color = region), alpha = 0.6, size = 1.5) +
+                geom_smooth(method = 'lm', se = F) +
+                scale_x_continuous(breaks = pretty_breaks(n = 8)) +
+                labs(
+                  x = xlab,
+                  y = ylab,
+                  color = 'Administrative region'
+                ) +
+                theme_bw()
             }
         }
         
@@ -459,16 +612,36 @@ server <- function(input, output, session) {
         
         else {
             if (input$scope1 == 'county') {
-                regional_hs %>%
-                    ggplot(aes_string(input$expl1, input$resp1)) +
-                    geom_point(aes(color = region), alpha = 0.8, size = 3) +
-                    geom_smooth(method = 'lm', se = F)
+              
+              req(input$expl1 %in% colnames(regional_hs))
+              req(input$resp1 %in% colnames(regional_hs))
+              
+              regional_hs %>%
+                ggplot(aes_string(input$expl1, input$resp1)) +
+                geom_point(aes(color = region), alpha = 0.8, size = 3) +
+                geom_smooth(method = 'lm', se = F) +
+                labs(
+                  x = xlab,
+                  y = ylab,
+                  color = 'Administrative region'
+                ) +
+                theme_bw()
             }
             else {
-                hs %>%
-                    ggplot(aes_string(input$expl1, input$resp1)) +
-                    geom_point(aes(color = region), alpha = 0.6, size = 1.5) +
-                    geom_smooth(method = 'lm', se = F)
+              
+              req(input$expl1 %in% colnames(hs))
+              req(input$resp1 %in% colnames(hs))
+              
+              hs %>%
+                ggplot(aes_string(input$expl1, input$resp1)) +
+                geom_point(aes(color = region), alpha = 0.6, size = 1.5) +
+                geom_smooth(method = 'lm', se = F) +
+                labs(
+                  x = xlab,
+                  y = ylab,
+                  color = 'Administrative region'
+                ) +
+                theme_bw()
             }
         }
     })
@@ -482,16 +655,34 @@ server <- function(input, output, session) {
         
         if (input$level3 == 'pr') {
             if (input$scope1 == 'county') {
-                regional_pr %>%
-                    lm(as.formula(paste(input$resp1, '~', input$expl1)), data = .) %>%
-                    tidy(conf.int = T) %>%
-                    select(term, estimate, std.error)
+              
+              req(input$expl1 %in% colnames(regional_pr))
+              req(input$resp1 %in% colnames(regional_pr))
+              
+              regional_pr %>%
+                lm(as.formula(paste(input$resp1, '~', input$expl1)), data = .) %>%
+                tidy(conf.int = T) %>%
+                select(term, estimate, std.error) %>%
+                rename(
+                  Variable = term,
+                  `Estimated coefficient` = estimate,
+                  `Standard error` = std.error
+                )
             }
             else {
-                pr %>%
-                    lm(as.formula(paste(input$resp1, '~', input$expl1)), data = .) %>%
-                    tidy(conf.int = T) %>%
-                    select(term, estimate, std.error)
+              
+              req(input$expl1 %in% colnames(pr))
+              req(input$resp1 %in% colnames(pr))
+              
+              pr %>%
+                lm(as.formula(paste(input$resp1, '~', input$expl1)), data = .) %>%
+                tidy(conf.int = T) %>%
+                select(term, estimate, std.error) %>%
+                rename(
+                  Variable = term,
+                  `Estimated coefficient` = estimate,
+                  `Standard error` = std.error
+                )
             }
         }
         
@@ -500,16 +691,34 @@ server <- function(input, output, session) {
         
         else {
             if (input$scope1 == 'county') {
-                regional_hs %>%
-                    lm(as.formula(paste(input$resp1, '~', input$expl1)), data = .) %>%
-                    tidy(conf.int = T) %>%
-                    select(term, estimate, std.error)
+              
+              req(input$expl1 %in% colnames(regional_hs))
+              req(input$resp1 %in% colnames(regional_hs))
+              
+              regional_hs %>%
+                lm(as.formula(paste(input$resp1, '~', input$expl1)), data = .) %>%
+                tidy(conf.int = T) %>%
+                select(term, estimate, std.error) %>%
+                rename(
+                  Variable = term,
+                  `Estimated coefficient` = estimate,
+                  `Standard error` = std.error
+                )
             }
             else {
-                hs %>%
-                    lm(as.formula(paste(input$resp1, '~', input$expl1)), data = .) %>%
-                    tidy(conf.int = T) %>%
-                    select(term, estimate, std.error)
+              
+              req(input$expl1 %in% colnames(hs))
+              req(input$resp1 %in% colnames(hs))
+              
+              hs %>%
+                lm(as.formula(paste(input$resp1, '~', input$expl1)), data = .) %>%
+                tidy(conf.int = T) %>%
+                select(term, estimate, std.error) %>%
+                rename(
+                  Variable = term,
+                  `Estimated coefficient` = estimate,
+                  `Standard error` = std.error
+                )
             }
         }
     })
