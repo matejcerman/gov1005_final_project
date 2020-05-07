@@ -112,7 +112,10 @@ ui <- navbarPage('Regional Inequality in Slovak Education',
                                                 'Administrative region' = 'region',
                                                 'School type' = 'type',
                                                 'Public or private' = 'pub_pri'),
-                                    selected = 'no')
+                                    selected = 'no'),
+                    'View histograms of the distributions of different educational outcomes. You
+                    can choose whether to look at primary or secondary schools and also whether to
+                    only consider some of the 8 administrative regions.'
                     )
                 ),
                 
@@ -154,7 +157,10 @@ ui <- navbarPage('Regional Inequality in Slovak Education',
                                            'Logged county population density (per km^2)' = 'log_dens',
                                            'Total population (in 1000s)' = 'pop_total',
                                            'Teachers per 100 students' = 'teachers'),
-                               selected = 'avg_income')
+                               selected = 'avg_income'),
+                   'The scatterplot shows the explanatory variable on the x-axis and the outcome variable 
+                   on the y-axis. The coefficients of a simple linear regression model between the two
+                   variables are displayed on the right.'
                 ),
             
 # Output shows a scatterplot with a best-fit line for the chosen variables.
@@ -228,8 +234,8 @@ ui <- navbarPage('Regional Inequality in Slovak Education',
             tags$a(href = 'http://creativecommons.org/licenses/by/4.0/',
                    'Cerative Commons 4.0 Attribution International'),
             'licence.',
-            'The geospatial data for Slovak counties is from',
-            tags$a(href = 'https://www.diva-gis.org/datadown', 'DIVA-GIS'),
+            'The geospatial data for Slovak counties comes from',
+            tags$a(href = 'https://www.diva-gis.org/datadown', 'DIVA-GIS.'),
             h2('About me'),
             "My name is Matej Cerman and I'm a Harvard University student hailing from Slovakia. I
             study Applied Math and Economics, hoping to use quantitative approaches to find new insights
@@ -577,7 +583,7 @@ server <- function(input, output, session) {
               regional_pr %>%
                 ggplot(aes_string(input$expl1, input$resp1)) +
                 geom_point(aes(color = region), alpha = 0.8, size = 3) +
-                geom_smooth(method = 'lm', se = F) +
+                geom_smooth(method = 'lm', color = 'indianred') +
                 scale_x_continuous(breaks = pretty_breaks(n = 8)) +
                 labs(
                   x = xlab,
@@ -594,7 +600,7 @@ server <- function(input, output, session) {
               pr %>%
                 ggplot(aes_string(input$expl1, input$resp1)) +
                 geom_point(aes(color = region), alpha = 0.6, size = 1.5) +
-                geom_smooth(method = 'lm', se = F) +
+                geom_smooth(method = 'lm', color = 'indianred') +
                 scale_x_continuous(breaks = pretty_breaks(n = 8)) +
                 labs(
                   x = xlab,
@@ -619,7 +625,7 @@ server <- function(input, output, session) {
               regional_hs %>%
                 ggplot(aes_string(input$expl1, input$resp1)) +
                 geom_point(aes(color = region), alpha = 0.8, size = 3) +
-                geom_smooth(method = 'lm', se = F) +
+                geom_smooth(method = 'lm', color = 'indianred') +
                 labs(
                   x = xlab,
                   y = ylab,
@@ -635,7 +641,7 @@ server <- function(input, output, session) {
               hs %>%
                 ggplot(aes_string(input$expl1, input$resp1)) +
                 geom_point(aes(color = region), alpha = 0.6, size = 1.5) +
-                geom_smooth(method = 'lm', se = F) +
+                geom_smooth(method = 'lm', color = 'indianred') +
                 labs(
                   x = xlab,
                   y = ylab,
