@@ -1,1 +1,2 @@
-# gov1005_final_project
+# Gov 1005 Final Project
+__Matej Cerman, May 2020__
